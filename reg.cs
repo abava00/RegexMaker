@@ -16,15 +16,15 @@ namespace UTK
   public class RegForm : Form
   {
     int pad = 1;
-    int padding = 1;
-    int apadding = 1;
-    int bpadding = 1;
+    int padding;
+    int apadding;
+    int bpadding;
     int terminate = 500;
     int count = 0;
     string q = "";
     MatchCollection collection = null;
     TableLayoutPanel tlp = new TableLayoutPanel() { Dock = DockStyle.Fill };
-    TableLayoutPanel ltlp = new TableLayoutPanel() { Height = 90, ColumnCount = 2, RowCount = 1, Dock = DockStyle.Fill };
+    TableLayoutPanel ltlp = new TableLayoutPanel() { Height = 60, ColumnCount = 2, RowCount = 1, Dock = DockStyle.Fill };
     TableLayoutPanel sltlp = new TableLayoutPanel() { Width = 150, ColumnCount = 3, RowCount = 2, };
     Button sbt = new Button() { Text = "検索", BackColor = Color.Gray, };
     Button ubt = new Button() { Text = "▲", Width = 25, BackColor = Color.Gray, };
@@ -116,24 +116,69 @@ namespace UTK
       string word = Regex.Escape(tb.SelectedText);
       int start = tb.SelectionStart;
       int end = tb.SelectionStart + tb.SelectionLength;
+      finds = n_GenerateRegex(finds, word, start, end);
 
-      GenerateRegex(finds, word, start, end);
-
-      // tb.Select(CurrentText(finds, 0), q.Length);
-      if (padding <= terminate)
+      try
       {
-        tb.Select(start, finds[0].Groups[1].Value.Length);
+        tb.Select(finds[0].Groups[1].Index, finds[0].Groups[1].Length);
+        Console.WriteLine("done1");
         tb.Focus();
+        tb.ScrollToCaret();
+        Console.WriteLine("done2");
+      }
+      catch (ArgumentOutOfRangeException e)
+      {
+        Console.WriteLine(e);
       }
       q = q.Replace("/", "\\/");
-      ab.Text = Regex.Escape(ab.Text);
-      bb.Text = Regex.Escape(bb.Text);
       rb.Text = q;
     }
 
-    private void GenerateRegex(MatchCollection finds, string word, int start, int end)
+    private MatchCollection n_GenerateRegex(MatchCollection finds, string word, int start, int end)
     {
-      // (.*?)に検索ワードがヒットしていない場合 または 検索絵結果が一意に決まっていない場合に
+      q = "";
+      apadding = pad;
+      bpadding = pad;
+      MatchCollection afinds = null;
+      MatchCollection bfinds = null;
+
+      bb.BackColor = Color.White;
+      ab.BackColor = Color.White;
+      //選択部分の前が一意に決まるまで検索をしたのち、選択部分の後ろが一意に決まるまで検索をする
+      //前部分の検索
+      do
+      {
+        string result = BAround(tb.Text, word, start, bpadding);
+        if ((bb.Text == result) || (bpadding > terminate)) { bb.BackColor = Color.Yellow; break; }
+        bb.Text = Regex.Escape(result);
+        bfinds = Regex.Matches(tb.Text, bb.Text);
+        bpadding++;
+
+      } while (bfinds.Count > 1);
+
+      //後ろ部分の検索
+      do
+      {
+        string result = AAround(tb.Text, word, end, apadding);
+        if ((ab.Text == result) || (apadding > terminate)) { ab.BackColor = Color.Yellow; break; }
+        ab.Text = Regex.Escape(result);
+        afinds = Regex.Matches(tb.Text, ab.Text);
+        apadding++;
+      } while (afinds.Count > 1);
+
+      q = bb.Text + "(.*?)" + ab.Text;
+      finds = SearchText(tb.Text, q, false);
+      return finds;
+
+    }
+
+    private MatchCollection GenerateRegex(MatchCollection finds, string word, int start, int end)
+    {
+      q = "";
+      padding = pad;
+      apadding = pad;
+      bpadding = pad;
+      // (.*?)に検索ワードがヒットしていない場合 または 検索絵結果が一意に決まっていない場合に検索続行
       while ((Regex.Match(tb.Text, q).Groups[1].Value != Regex.Unescape(word)) || (finds.Count != 1))
       {
         // 選択した文字の前後[padding]文字を取得する
@@ -182,6 +227,7 @@ namespace UTK
         // if ((finds.Count == 1)) { Console.WriteLine("出る条件1"); }
         // if ((Regex.Match(tb.Text, q).Groups[1].Value == Regex.Unescape(word))) { Console.WriteLine("出る条件2"); }
       }
+      return finds;
     }
 
 
